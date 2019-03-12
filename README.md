@@ -1,6 +1,7 @@
-# docker-study
+# Docker Study #1 Docker 이미지를 활용한 웹 서버 구축
 
-Docker 기본 개념과 명령어, 컨테이너 배포까지 정리한 내용입니다.
+> Docker Study #1 summary:  
+> Docker 기본 개념과 명령어를 학습하고 Docker 이미지를 활용하여 웹 서버 구축
 
 ## 참고 사이트
 
@@ -250,3 +251,127 @@ docker push daisyleenr/ubuntu-nginx-hello-world
 ```
 docker run -d -p 80:80 -v /tmp/var/www/html:/var/www/html daisyleenr/ubuntu-nginx-hello-world
 ```
+
+---
+
+# Docker Study #2 Private Docker Registry 구축과 Dockerfile 및 Docker Compose 익히기
+
+> Docker Study #2 summary:  
+> 나만의 Docker Registry를 구축하고 Dockerfile과 Docker Compose 예제를 만들어봅니다.  
+> Docker Registry 기본 개념은 공식 문서인 https://docs.docker.com/registry/ 의 내용을 가져왔습니다.
+
+## 참고 사이트
+
+- Docker Registry 공식 문서: https://docs.docker.com/registry/
+
+## Docker Registry란?
+
+Registry는 Docker 이미지를 저장하고 배포할 수 있는 서버 사이드 애플리케이션이며, Apache license가 적용된 오픈 소스이다.  
+보안 상 Docker 이미지를 Docker Hub에 올릴 수 없는 경우 Docker Private Registry를 구축하여 내부에서만 이미지를 관리할 수 있다.
+
+또한, Registry는 인증, 권한 부여, webhook을 이용한 notification 기능을 제공한다. (이번에 다루지는 않음)
+
+Docker Registry를 구축하기 위해서는 Docker engine 버전이 1.6.0 이상이어야 한다.
+
+## Basic Command
+
+1. registry 실행
+
+```
+$ docker run -d -p 5000:5000 --name registry registry:2
+```
+
+2. 샘플로 사용할 ubuntu 이미지를 docker hub에서 pull 한다.
+
+```
+$ docker pull ubuntu
+```
+
+3. 이미지를 registry를 업로드 할 수 있도록 tag를 지정한다.
+
+```
+$ docker image tag ubuntu localhost:5000/myfirstimage
+$ docker images
+REPOSITORY                            TAG                 IMAGE ID            CREATED             SIZE
+localhost:5000/myfirstimage           latest              94e814e2efa8        6 hours ago         88.9MB
+ubuntu                                latest              94e814e2efa8        6 hours ago         88.9MB
+```
+
+4. 이미지를 push 한다.
+
+```
+$ docker push localhost:5000/myfirstimage
+The push refers to repository [localhost:5000/myfirstimage]
+b57c79f4a9f3: Pushed
+d60e01b37e74: Pushed
+e45cfbc98a50: Pushed
+762d8e1a6054: Pushing [=========================================>         ]  74.13MB/88.91MB
+```
+
+5. 이미지를 pull 한다.
+
+```
+$ docker pull localhost:5000/myfirstimage
+Using default tag: latest
+latest: Pulling from myfirstimage
+Digest: sha256:f2557f94cac1cc4509d0483cb6e302da841ecd6f82eb2e91dc7ba6cfd0c580ab
+Status: Image is up to date for localhost:5000/myfirstimage:latest
+```
+
+6. registry를 종료하고 데이터를 삭제한다.
+
+```
+$ docker container stop registry && docker container rm -v registry
+```
+
+- 주의) 기본 예제는 테스트용이므로 실제 프로덕션에 구축할 때에는 아래 문서를 참고한다.
+  https://docs.docker.com/registry/configuration/
+
+## Docker 이미지 이름에 대한 이해
+
+Docker command에 사용되는 이미지 이름은 이미지의 소스를 가리킨다.  
+`docker pull ubuntu`의 경우 `docker pull docker.io/library/ubuntu`가 간소화 된 것 이다.  
+`docker pull myregistrydomain:port/foo/bar`는 `myregistrydomain:port` registry의 `foo/bar`이미지를 찾는다.
+
+## Use cases
+
+- CI/CD 구축  
+  `git commit` - `build(CI)` - `push a new image to your Registry` - `notification from Registry` - `trigger` - `deploy`
+- large cluster of machines 환경에서 빠르게 이미지 배포할 때 사용
+- isolated network 환경에서 배포할 때 사용
+
+## Requirement
+
+Registry를 시작하는 것은 쉽지만, 프로덕션 환경에서 운영하려면 다른 서비스처럼 운영 기술이 필요하다. availability, scalability, logging, log processing, systems monitoring, security등에 익숙해야 한다. http 및 네트워크에 대한 이해 및 golang 지식이 있으면 advanced operations or hacking에 유용하다. (Registry v2가 golang으로 개발되었음)
+
+## Basic configuration
+
+https://docs.docker.com/registry/deploying/#basic-configuration
+
+## Storage customization
+
+Registry는 기본적으로 docker volumn에 파일을 저장한다.  
+특정 위치에 저장하고 싶은 경우 -v 옵션으로 설정한다.
+
+```
+$ docker run -d \
+  -p 5000:5000 \
+  --restart=always \
+  --name registry \
+  -v /mnt/registry:/var/lib/registry \
+  registry:2
+```
+
+또한, Amazon S3 등 클라우드 스토리지에 저장할 수도 있다. 자세한 내용은 아래 링크 참고.  
+https://docs.docker.com/registry/configuration/#storage
+
+## 보안 관련
+
+localhost가 아닌 외부에서 접근 가능하게 하려면 TLS(SSL)를 사용하여 Registry를 보호해야 한다.  
+Run an externally-accessible registry, Load balancing considerations, Restricting access는 이번 스터디에서는 생략한다.
+
+## Registry를 운영하게 될 때 추가로 스터디 할 내용들
+
+- 보안: https://docs.docker.com/registry/deploying/#run-an-externally-accessible-registry
+- 실제 운영에서 적용해야하는 configuration: https://docs.docker.com/registry/configuration/
+- notifications: https://docs.docker.com/registry/notifications/
