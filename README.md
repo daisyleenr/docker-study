@@ -1,10 +1,10 @@
 2019년 Docker Study를 하며 정리한 내용이다. 각 챕터마다 참고한 원글 링크를 달아두었다.  
-학습을 위해 개인 로컬 환경에서 다룬 내용들이기 때문에 실제 서비스 운영에 바로 적용하기는 어렵다.  
-하지만 Docker를 직접 사용해보고 빠르게 결과를 볼 수 있는 간단한 예제들로 구성되어있다.
+Docker를 직접 사용해보고 빠르게 결과를 볼 수 있는 간단한 예제들로 구성되어있다.  
+학습을 위해 `MacOS` 환경에서 다룬 내용들이기 때문에 실제 서비스 운영에 바로 적용하기는 어렵다.
 
 - [#1 Docker를 활용한 Hello World 웹 서버 만들기](#1-Docker를-활용한-Hello-World-웹-서버-만들기)
 - [#2 로컬 환경에 Private Docker Registry 만들기](#2-로컬-환경에-Private-Docker-Registry-만들기)
-- [#3 Docker Compose를 이용하여 모니터링 시스템 만들기](#3-Docker-Compose를-이용하여-모니터링-시스템-만들기)
+- [#3 Docker Compose를 이용하여 모니터링 시스템 구축](#3-Docker-Compose를-이용하여-모니터링-시스템-구축)
 
 ---
 
@@ -277,7 +277,7 @@ docker run -d -p 80:80 -v /tmp/var/www/html:/var/www/html daisyleenr/ubuntu-ngin
 ## Docker Registry란?
 
 Registry는 Docker 이미지를 저장하고 배포할 수 있는 서버 사이드 애플리케이션이며, Apache license가 적용된 오픈 소스이다.  
-보안 상 Docker 이미지를 Docker Hub에 올릴 수 없는 경우 Docker Private Registry를 구축하여 내부에서만 이미지를 관리할 수 있다.
+보안 상 Docker 이미지를 Docker Hub에 올릴 수 없는 경우 Docker Registry를 구축하여 내부에서만 이미지를 관리할 수 있다.
 
 또한, Registry는 인증, 권한 부여, webhook을 이용한 notification 기능을 제공한다. (이번에 다루지는 않음)
 
@@ -364,14 +364,14 @@ https://docs.docker.com/registry/deploying/#basic-configuration
 ## Storage customization
 
 Registry는 기본적으로 docker volumn에 파일을 저장한다.  
-특정 위치에 저장하고 싶은 경우 -v 옵션으로 설정한다.
+특정 위치에 저장하고 싶은 경우 -v 옵션으로 설정한다. (-v <호스트 디렉터리>:<컨테이너 디렉터리>)
 
 ```
 $ docker run -d \
   -p 5000:5000 \
   --restart=always \
   --name registry \
-  -v /mnt/registry:/var/lib/registry \
+  -v /Users/naralee/workspace/git/docker-study/example/registry:/var/lib/registry \
   registry:2
 ```
 
@@ -385,20 +385,155 @@ Run an externally-accessible registry, Load balancing considerations, Restrictin
 
 ## Docker Registry Web UI
 
-- https://github.com/veggiemonk/awesome-docker
-- https://github.com/genuinetools/reg
-- https://awesome-docker.netlify.com/#web
-- https://github.com/atcol/docker-registry-ui
-- https://github.com/atcol/docker-registry-ui/issues/170
-- https://hub.docker.com/r/opensuse/portus/
-- https://github.com/SUSE/Portus
+Docker Registry를 Web UI로 보여주는 다양한 오픈소스들이 존재한다. (아래 링크 참고)  
+https://github.com/veggiemonk/awesome-docker/#web
+
+이 중에서 star가 가장 많은 atcol/docker-registry-ui를 적용해보았지만, 이미지 리스트가 뜨지 않았고 관련 이슈가 등록이 되어있는데 반영이 되지 않는 듯 하여 다른 프로젝트로 변경한다.  
+https://github.com/atcol/docker-registry-ui/issues/170
+
+port.us(https://github.com/SUSE/Portus) 등 registry의 다양한 기능을 Web으로 이용할 수 있는 프로젝트들이 있는데, 나는 가장 단순하게 등록된 이미지의 정보만 필요해서 아래의 프로젝트를 선택하였다.  
+https://hub.docker.com/r/klausmeyer/docker-registry-browser/
 
 ```
-$ docker run --name registry-browser -it -p 8080:8080 -e DOCKER_REGISTRY_URL=http://192.168.0.3:5000 klausmeyer/docker-registry-browser
+$ docker run --name registry-browser -d -p 8080:8080 -e DOCKER_REGISTRY_URL=http://192.168.0.3:5000 klausmeyer/docker-registry-browser
 ```
+
+localhost:8080을 접속하면 아래 화면에 나의 docker registry에 올라간 이미지 목록이 나온다.
+
+<img width="726" alt="스크린샷 2019-03-13 오후 6 21 29" src="https://user-images.githubusercontent.com/12470452/54267684-0403bc80-45bd-11e9-9799-27d010c04c15.png">
 
 ## Registry를 운영하게 될 때 추가로 스터디 할 내용들
 
 - 보안: https://docs.docker.com/registry/deploying/#run-an-externally-accessible-registry
 - 실제 운영에서 적용해야하는 configuration: https://docs.docker.com/registry/configuration/
 - notifications: https://docs.docker.com/registry/notifications/
+
+---
+
+# #3 Docker Compose를 이용하여 모니터링 시스템 구축
+
+> _목표:_  
+> Docker Compose를 학습하기 위해 시스템 지표를 수집하는 간단한 모니터링 시스템을 구축한다.  
+> 모니터링 시스템은 오픈소스인 Telegraf + InfluxDB + Grafana를 Docker Compose를 이용하여 구축한다.
+
+## 참고 사이트
+
+- Docker, Telegraf, Influxdb, Grafana로 5분만에 system metrics 수집하기:  
+  https://towardsdatascience.com/get-system-metrics-for-5-min-with-docker-telegraf-influxdb-and-grafana-97cfd957f0ac
+
+## Docker Compose란?
+
+여러 컨테이너를 정의하고 실행하기 위한 도구이다. YAML 파일에 서비스에 필요한 컨테이너 설정을 정의하고 single command로 구성 할 수 있다.
+
+## InfluxDB, Grafana 구축을 위한 docker-compose.yml 파일 생성
+
+프로젝트 폴더를 생성하고 docker-compose.yml을 작성한다.
+
+```
+$ mkdir /opt/monitoring && cd /opt/monitoring
+$ vi docker-compose.yml
+```
+
+docker-compose.yml
+
+```
+version: "2"
+services:
+  grafana: # 서비스 이름
+    image: grafana/grafana # 사용할 이미지
+    container_name: grafana # 컨테이너 이름
+    restart: always # command 실행 결과에 따라 재시작한다
+    ports:
+      - 3000:3000 # port 설정
+    networks:
+      - monitoring # 네트워크를 생성하고 컨테이너를 연결시키면 해당 네트워크 안에 속한 컨테이너끼리 서로 접속할 수 있다
+    volumes:
+      - grafana-volume:/var/lib/grafana
+  influxdb:
+    image: influxdb
+    container_name: influxdb
+    restart: always
+    ports:
+      - 8086:8086
+    networks:
+      - monitoring
+    volumes:
+      - influxdb-volume:/var/lib/influxdb
+networks:
+  monitoring:
+volumes:
+  grafana-volume:
+    external: true
+  influxdb-volume:
+    external: true # 프로젝트를 생성할 때마다 볼륨을 새로 만들지 않고 기존 볼륨을 사용한다
+```
+
+## Docker network와 volume 생성
+
+```
+$ docker network create monitoring
+$ docker volume create grafana-volume
+$ docker volume create influxdb-volume
+
+$ docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+f5ecb2af5e63        bridge              bridge              local
+754450c648ac        host                host                local
+2a2bf1d1fd43        monitoring          bridge              local
+cc9ffeab029c        none                null                local
+
+$ docker volume ls
+local
+DRIVER              VOLUME NAME
+local               grafana-volume
+local               influxdb-volume
+```
+
+## InfluxDB 환경 설정
+
+InfluxDB database와 user를 생성하기 위해 한번은 influxDB parameter를 넣고 컨테이너를 실행해야 한다. --rm 옵션을 주고 컨테이너를 실행하면 환경 설정을 influxdb-volume에 구성하고 컨테이너를 삭제한다.
+
+```
+$ docker run --rm \
+  -e INFLUXDB_DB=telegraf -e INFLUXDB_ADMIN_ENABLED=true \
+  -e INFLUXDB_ADMIN_USER=admin \
+  -e INFLUXDB_ADMIN_PASSWORD=supersecretpassword \
+  -e INFLUXDB_USER=telegraf -e INFLUXDB_USER_PASSWORD=secretpassword \
+  -v influxdb-volume:/var/lib/influxdb \
+  influxdb /init-influxdb.sh
+```
+
+## docker-compose 실행
+
+```
+docker-compose up -d
+```
+
+## Grafana 설정
+
+1. localhost:3000 접속 후 로그인한다. (admin/admin)
+   <img width="1669" alt="스크린샷 2019-03-13 오후 6 59 25" src="https://user-images.githubusercontent.com/12470452/54270186-2d731700-45c2-11e9-819c-30d03bc24e91.png">
+
+2. Add data source
+   ![image](https://user-images.githubusercontent.com/12470452/54270418-bbe79880-45c2-11e9-8f32-e8caf2429a22.png)  
+   ![image](https://user-images.githubusercontent.com/12470452/54270622-28fb2e00-45c3-11e9-9410-7743bac09b00.png)  
+   입력해줘야 하는 것들 (--rm 옵션으로 설정했던 환경변수 값)
+
+- HTTP URL: http://influxdb:8086
+- Database: telegraf
+- User: telegraf
+- Password: secretpassword
+
+3. Grafana 대시보드 템플릿 추가  
+   https://grafana.com/dashboards/914  
+   ![image](https://user-images.githubusercontent.com/12470452/54270902-c191ae00-45c3-11e9-84c9-1908e7c99133.png)
+
+4. Telegraf 설치  
+   https://docs.influxdata.com/telegraf/v1.9/introduction/installation/#installation  
+   ![image](https://user-images.githubusercontent.com/12470452/54270951-dbcb8c00-45c3-11e9-8702-a40efecd4ebd.png)
+
+## Telegraf + InfluxDB + Grafana
+
+- Telegraf:
+- InfluxDB:
+- Grafana:
