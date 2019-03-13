@@ -1,30 +1,40 @@
-# Docker Study #1 Docker 이미지를 활용한 웹 서버 구축
+2019년 Docker Study를 하며 정리한 내용이다. 각 챕터마다 참고한 원글 링크를 달아두었다.  
+학습을 위해 개인 로컬 환경에서 다룬 내용들이기 때문에 실제 서비스 운영에 바로 적용하기는 어렵다.  
+하지만 Docker를 직접 사용해보고 빠르게 결과를 볼 수 있는 간단한 예제들로 구성되어있다.
 
-> Docker Study #1 summary:  
-> Docker 기본 개념과 명령어를 학습하고 Docker 이미지를 활용하여 웹 서버 구축
+- [#1 Docker를 활용한 Hello World 웹 서버 만들기](##1-Docker를-활용한-Hello-World-웹-서버-만들기)
+- [#2 로컬 환경에 Private Docker Registry 만들기](##2-로컬-환경에-Private-Docker-Registry-만들기)
+- [#3 Docker Compose를 이용하여 모니터링 시스템 만들기](##3-Docker-Compose를-이용하여-모니터링-시스템-만들기)
+
+---
+
+# #1 Docker를 활용한 Hello World 웹 서버 만들기
+
+> _목표:_  
+> Docker 기본 개념과 명령어를 학습하고 Docker 이미지를 활용하여 웹 서버를 구축해본다.
 
 ## 참고 사이트
 
 - Docker 공식 문서: https://docs.docker.com/get-started/
-- T 아카데미: https://tacademy.skplanet.com/live/player/onlineLectureDetail.action?seq=125
 - 가장 빨리 만나는 Docker: http://pyrasis.com/book/DockerForTheReallyImpatient
+- T 아카데미: https://tacademy.skplanet.com/live/player/onlineLectureDetail.action?seq=125
 
-## Docker란
+## Docker란?
 
-`Immutable Infrastructure`는 호스트 OS와 서비스 운영 환경을 분리하고, 한 번 설정한 운영 환경은 변경하지 않는다(Immutable)는 개념이다.
+Docker는 개발자와 시스템 관리자가 컨테이너로 개발, 배포, 실행할 수 있는 플랫폼이다.
 
-Docker는 OS와 서비스 운영 환경을 분리하고 서비스 운영 환경을 이미지로 생성할 수 있다.
+컨테이너는 이미지를 통해 실행되는데, 이미지는 응용 프로그램을 실행하기 위해 필요한 것들(코드, 라이브러리, 환경 변수 등)을 포함하는 실행 패키지이다.
 
-Docker 이미지를 통해 배포하면 동일한 환경에서의 실행을 보장할 수 있고 이미지를 중앙에서 배포와 관리를 할 수 있다. 이미지 하나로 계속 서비스를 확장할 수 있고(auto scale) 동일한 환경에서의 테스트를 가능하게 한다.
+Docker 이미지를 통해 배포하면 각각 다른 서버일지라도 Docker 이미지에 세팅된 동일한 환경에서의 실행을 보장할 수 있고, Docker 이미지를 중앙에서 관리 할 수 있다.(예: Docker Hub, Docker Registry) 또한, Docker 이미지 하나로 auto scale 할 수 있고 동일한 환경에서의 테스트를 할 수 있다.
 
 ## Virtual Machine vs Container
 
 http://pyrasis.com/book/DockerForTheReallyImpatient/Chapter01/01
 
-- Virtual Machine: VM은 하드웨어를 소프트웨어로 가상화 한 것이다. 그래서 컴퓨터와 동일하게 그 위에 OS를 설치하고 리얼 머신에 비해 속도가 느리다. 가상화 이미지도 역시 용량이 크다
+- Virtual Machine: VM은 하드웨어를 소프트웨어로 가상화 한 것이다. 그래서 컴퓨터와 동일하게 VM에 OS를 설치하고, 리얼 머신에 비해 속도가 느리다. 가상화 이미지 용량도 크다.
 
-- Container: 컨테이너는 VM 보다 경량화 된 방식으로 운영을 위한 프로그램과 라이브러리마 격리하고 OS 자원은 호스트와 공유한다. 가상화 하는 계층이 없기 때문에 메모리, 파일 시스템, 네트워크 속도가 VM에 비해 빠르고 용량이 작다.
-  Docker는 리눅스 OS 기반이기 때문에 MacOS나 Windows OS OS에서는 VM위에 Docker가 실행되는 방식이다.
+- Container: 컨테이너는 VM 보다 경량화 된 방식으로 운영을 위한 프로그램과 라이브러리는 분리하되 OS 자원(Linux)은 호스트와 공유한다. 컨테이너는 가상화 하는 계층이 없기 때문에 메모리, 파일 시스템, 네트워크 속도가 VM에 비해 빠르고 이미지 용량이 작다.  
+  (\* Docker는 Linux OS 기반이기 때문에 MacOS나 Windows OS에서는 VM위에서 Docker가 실행된다.)
 
 ## Docker 기본 명령어
 
@@ -254,11 +264,11 @@ docker run -d -p 80:80 -v /tmp/var/www/html:/var/www/html daisyleenr/ubuntu-ngin
 
 ---
 
-# Docker Study #2 Private Docker Registry 구축과 Dockerfile 및 Docker Compose 익히기
+# #2 로컬 환경에 Private Docker Registry 만들기
 
-> Docker Study #2 summary:  
-> 나만의 Docker Registry를 구축하고 Dockerfile과 Docker Compose 예제를 만들어봅니다.  
-> Docker Registry 기본 개념은 공식 문서인 https://docs.docker.com/registry/ 의 내용을 가져왔습니다.
+> _목표:_  
+> Docker Registry를 이해하고 나만의 Docker Registry를 구축해본다.  
+> Docker Registry 기본 개념은 공식 문서인 https://docs.docker.com/registry/ 에서 가져왔다.
 
 ## 참고 사이트
 
@@ -306,6 +316,9 @@ b57c79f4a9f3: Pushed
 d60e01b37e74: Pushed
 e45cfbc98a50: Pushed
 762d8e1a6054: Pushing [=========================================>         ]  74.13MB/88.91MB
+
+$ curl -X GET http://localhost:5000/v2/_catalog
+{"repositories":["myfirstimage"]}
 ```
 
 5. 이미지를 pull 한다.
@@ -369,6 +382,20 @@ https://docs.docker.com/registry/configuration/#storage
 
 localhost가 아닌 외부에서 접근 가능하게 하려면 TLS(SSL)를 사용하여 Registry를 보호해야 한다.  
 Run an externally-accessible registry, Load balancing considerations, Restricting access는 이번 스터디에서는 생략한다.
+
+## Docker Registry Web UI
+
+- https://github.com/veggiemonk/awesome-docker
+- https://github.com/genuinetools/reg
+- https://awesome-docker.netlify.com/#web
+- https://github.com/atcol/docker-registry-ui
+- https://github.com/atcol/docker-registry-ui/issues/170
+- https://hub.docker.com/r/opensuse/portus/
+- https://github.com/SUSE/Portus
+
+```
+$ docker run --name registry-browser -it -p 8080:8080 -e DOCKER_REGISTRY_URL=http://192.168.0.3:5000 klausmeyer/docker-registry-browser
+```
 
 ## Registry를 운영하게 될 때 추가로 스터디 할 내용들
 
